@@ -35,8 +35,8 @@ pipeline:
       install -Dm755 i2pd "${{targets.destdir}}/usr/bin/i2pd"
 
       install -dm755 "${{targets.destdir}}/usr/share/i2pd"
-      install -dm700 -o 65532 -g 65532 "${{targets.destdir}}/var/lib/i2pd"
-      install -dm755 -o 65532 -g 65532 "${{targets.destdir}}/var/log/i2pd"
+      install -dm700 "${{targets.destdir}}/var/lib/i2pd"
+      install -dm755 "${{targets.destdir}}/var/log/i2pd"
 
       install -Dm644 contrib/tunnels.conf "${{targets.destdir}}/etc/i2pd/tunnels.conf"
       install -Dm644 contrib/docker/i2pd-docker.conf "${{targets.destdir}}/etc/i2pd/i2pd.conf"
