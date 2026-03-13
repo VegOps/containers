@@ -1,0 +1,41 @@
+package:
+  name: miniupnpc
+  version: 2.3.3
+  epoch: 0
+  description: Lightweight UPnP client library and tools
+  copyright:
+    - license: BSD-3-Clause
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+      - build-base
+      - wget
+
+pipeline:
+  - runs: |
+      set -euo pipefail
+
+      VER="${{package.version}}"
+      TAG="miniupnpc_${VER//./_}"
+
+      wget -q "https://github.com/miniupnp/miniupnp/releases/download/${TAG}/miniupnpc-${VER}.tar.gz"
+      tar xzf "miniupnpc-${VER}.tar.gz"
+
+      cd "miniupnpc-${VER}"
+      make -j"$(nproc)"
+      make DESTDIR="${{targets.destdir}}" INSTALLPREFIX=/usr install
+
+subpackages:
+  - name: miniupnpc-dev
+    description: Development files for miniupnpc
+    dependencies:
+      runtime:
+        - miniupnpc=${{package.full-version}}
+    pipeline:
+      - uses: split/dev
