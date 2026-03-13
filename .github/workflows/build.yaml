@@ -206,6 +206,12 @@ jobs:
           merge-multiple: true
           path: .
 
+      - name: Re-index local packages
+        run: |
+          if [ -d "packages/${{ matrix.arch }}" ]; then
+            melange index -o "packages/${{ matrix.arch }}/APKINDEX.tar.gz" "packages/${{ matrix.arch }}"/*.apk
+          fi
+
       - name: Build package with melange
         run: |
           chmod 600 melange.rsa
@@ -269,6 +275,19 @@ jobs:
           pattern: packages-*-*
           merge-multiple: true
           path: .
+
+      - name: Install melange
+        run: |
+          go install chainguard.dev/melange@${{ env.MELANGE_VERSION }}
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Re-index local packages
+        run: |
+          for arch in x86_64 aarch64; do
+            if [ -d "packages/$arch" ]; then
+              melange index -o "packages/$arch/APKINDEX.tar.gz" "packages/$arch"/*.apk
+            fi
+          done
 
       - name: Setup signing key (protected branch)
         if: github.event_name != 'pull_request'
