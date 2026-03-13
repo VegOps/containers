@@ -32,14 +32,16 @@ pipeline:
 
       strip i2pd
 
-      install -Dm755 i2pd "${{targets.destdir}}/usr/bin/i2pd"
+      mkdir -p "${{targets.destdir}}/usr/bin"
+      cp i2pd "${{targets.destdir}}/usr/bin/i2pd"
 
-      install -dm755 "${{targets.destdir}}/usr/share/i2pd"
-      install -dm700 "${{targets.destdir}}/var/lib/i2pd"
-      install -dm755 "${{targets.destdir}}/var/log/i2pd"
+      mkdir -p "${{targets.destdir}}/usr/share/i2pd"
+      mkdir -p "${{targets.destdir}}/var/lib/i2pd"
+      mkdir -p "${{targets.destdir}}/var/log/i2pd"
 
-      install -Dm644 contrib/tunnels.conf "${{targets.destdir}}/etc/i2pd/tunnels.conf"
-      install -Dm644 contrib/docker/i2pd-docker.conf "${{targets.destdir}}/etc/i2pd/i2pd.conf"
+      mkdir -p "${{targets.destdir}}/etc/i2pd"
+      cp contrib/tunnels.conf "${{targets.destdir}}/etc/i2pd/tunnels.conf"
+      cp contrib/docker/i2pd-docker.conf "${{targets.destdir}}/etc/i2pd/i2pd.conf"
       cp -r contrib/certificates "${{targets.destdir}}/usr/share/i2pd/certificates"
       ln -s /usr/share/i2pd/certificates "${{targets.destdir}}/var/lib/i2pd/certificates"
 
