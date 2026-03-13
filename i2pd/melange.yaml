@@ -36,14 +36,11 @@ pipeline:
       cp i2pd "${{targets.destdir}}/usr/bin/i2pd"
 
       mkdir -p "${{targets.destdir}}/usr/share/i2pd"
-      mkdir -p "${{targets.destdir}}/var/lib/i2pd"
-      mkdir -p "${{targets.destdir}}/var/log/i2pd"
+      cp -r contrib/certificates "${{targets.destdir}}/usr/share/i2pd/certificates"
 
       mkdir -p "${{targets.destdir}}/etc/i2pd"
       cp contrib/tunnels.conf "${{targets.destdir}}/etc/i2pd/tunnels.conf"
       cp contrib/docker/i2pd-docker.conf "${{targets.destdir}}/etc/i2pd/i2pd.conf"
-      cp -r contrib/certificates "${{targets.destdir}}/usr/share/i2pd/certificates"
-      ln -s /usr/share/i2pd/certificates "${{targets.destdir}}/var/lib/i2pd/certificates"
 
       # Patch config for container use
       sed -i 's/^log = file/log = stdout/' "${{targets.destdir}}/etc/i2pd/i2pd.conf"
