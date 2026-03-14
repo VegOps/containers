@@ -323,6 +323,22 @@ jobs:
 
           docker load < "${{ matrix.name }}.tar"
 
+          TARGET_IMAGE="${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:${{ github.sha }}"
+          LOADED_IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep "^${TARGET_IMAGE}-amd64$" | head -1 || true)
+          if [ -z "$LOADED_IMAGE" ]; then
+            LOADED_IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep "${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}" | head -1 || true)
+          fi
+
+          if [ -z "$LOADED_IMAGE" ]; then
+            echo "::error::Could not find loaded image for ${{ matrix.name }} after docker load"
+            docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}' | head -30
+            exit 1
+          fi
+
+          if [ "$LOADED_IMAGE" != "$TARGET_IMAGE" ]; then
+            docker tag "$LOADED_IMAGE" "$TARGET_IMAGE"
+          fi
+
       - name: Scan with Grype
         id: grype
         uses: anchore/scan-action@v6
