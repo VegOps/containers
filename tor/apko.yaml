@@ -9,7 +9,7 @@ contents:
     - libevent
     - libseccomp
     - openssl
-    - xz-libs
+    - xz
     - zlib
     - zstd
     - tor
