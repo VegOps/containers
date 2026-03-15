@@ -448,6 +448,17 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Re-index local packages
+        run: |
+          if [ -f "melange.rsa" ]; then
+            for arch in x86_64 aarch64; do
+              if [ -d "packages/$arch" ]; then
+                echo "Indexing $arch packages..."
+                melange index --signing-key melange.rsa -o "packages/$arch/APKINDEX.tar.gz" "packages/$arch"/*.apk
+              fi
+            done
+          fi
+
       - name: Publish multi-arch image
         run: |
           ARGS=""
