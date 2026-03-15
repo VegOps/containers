@@ -295,12 +295,20 @@ jobs:
             chmod 600 melange.rsa
           fi
 
-      - name: Re-index local packages
+      - name: Re-index local packages and build
         run: |
           if [ -f "melange.rsa" ]; then
             if [ -d "packages/${{ matrix.arch }}" ]; then
               melange index --signing-key melange.rsa -o "packages/${{ matrix.arch }}/APKINDEX.tar.gz" "packages/${{ matrix.arch }}"/*.apk
             fi
+          fi
+
+          ARGS=""
+          if [ -f "melange.rsa.pub" ]; then
+            ARGS="$ARGS --keyring-append ./melange.rsa.pub"
+          fi
+          if [ -d "./packages" ]; then
+            ARGS="$ARGS --repository-append ./packages"
           fi
 
           apko build "${{ matrix.name }}/apko.yaml" \
