@@ -317,22 +317,30 @@ jobs:
             --arch "${{ matrix.arch }}" \
             $ARGS
 
-      - name: Scan with Grype
-        id: grype
+      - name: Scan with Grype (SARIF)
+        id: grype-sarif
         uses: anchore/scan-action@v6
         with:
           image: "docker-archive:./${{ matrix.name }}-${{ matrix.arch }}.tar"
-          output-format: sarif,json
+          output-format: sarif
+          fail-build: false
+
+      - name: Scan with Grype (JSON)
+        id: grype-json
+        uses: anchore/scan-action@v6
+        with:
+          image: "docker-archive:./${{ matrix.name }}-${{ matrix.arch }}.tar"
+          output-format: json
           fail-build: false
 
       - name: Rename Grype JSON report
         run: |
-          mv results.json "cve-report-${{ matrix.name }}-${{ matrix.arch }}.json"
+          mv "${{ steps.grype-json.outputs.json }}" "cve-report-${{ matrix.name }}-${{ matrix.arch }}.json"
 
       - name: Upload Grype SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: ${{ steps.grype.outputs.sarif }}
+          sarif_file: ${{ steps.grype-sarif.outputs.sarif }}
           category: grype-${{ matrix.name }}-${{ matrix.arch }}
 
       - name: Scan with Trivy
