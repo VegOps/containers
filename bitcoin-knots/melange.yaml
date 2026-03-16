@@ -43,6 +43,9 @@ pipeline:
       "https://github.com/bitcoinknots/bitcoin/releases/download/v${UPSTREAM_VER}/SHA256SUMS.asc" \
       "https://github.com/bitcoinknots/bitcoin/releases/download/v${UPSTREAM_VER}/SHA256SUMS"
 
+      export GNUPGHOME="$(mktemp -d)"
+      trap 'rm -rf "$GNUPGHOME"' EXIT
+
       curl -s "https://api.github.com/repos/bitcoinknots/guix.sigs/contents/builder-keys" | jq -r '.[].download_url' | while read url; do curl -s "$url" | gpg --import; done
       gpg --verify SHA256SUMS.asc SHA256SUMS
 
