@@ -1,0 +1,76 @@
+package:
+  name: qt-minimal
+  version: 6.10.2
+  epoch: 0
+  description: Minimal Qt 6 for Fulcrum build
+  copyright:
+    - license: LGPL-3.0
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+      - build-base
+      - cmake
+      - git
+      - openssl-dev
+      - perl
+      - samurai
+      - mesa-dev
+      - linux-headers
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/qt/qtbase.git
+      tag: v${{package.version}}
+
+  - runs: |
+      ./configure \
+        -static \
+        -release \
+        -prefix /usr \
+        -c++std c++17 \
+        -nomake tests \
+        -nomake examples \
+        -no-feature-testlib \
+        -no-gui \
+        -no-dbus \
+        -no-widgets \
+        -no-feature-animation \
+        -openssl \
+        -openssl-linked \
+        -optimize-size \
+        -feature-optimize_full
+
+      cmake --build . --parallel $(nproc)
+      cmake --install .
+      DESTDIR="${{targets.destdir}}" cmake --install .
+
+  - runs: |
+      git clone --depth 1 --branch v${{package.version}} \
+        https://github.com/qt/qttools.git /home/build/qttools
+
+  - runs: |
+      cd /home/build/qttools
+      cmake -Wno-dev -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_CXX_STANDARD=17 \
+        -DCMAKE_PREFIX_PATH=/usr \
+        -DCMAKE_EXE_LINKER_FLAGS="-static" \
+        -DBUILD_SHARED_LIBS=OFF
+      cmake --build build --parallel $(nproc)
+      DESTDIR="${{targets.destdir}}" cmake --install build
+
+update:
+  enabled: true
+  github:
+    identifier: qt/qtbase
+    use-tag: true
+    tag-filter-prefix: v6.10.
+    strip-prefix: v
