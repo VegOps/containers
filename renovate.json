@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended"
   ],
+  "ignoreUnstable": true,
   "packageRules": [
     {
       "groupName": "github-actions",
