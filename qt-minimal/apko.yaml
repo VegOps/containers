@@ -23,6 +23,9 @@ entrypoint:
 
 cmd: --version
 
+environment:
+  LANG: C.UTF-8
+
 annotations:
   org.opencontainers.image.title: "qt-minimal"
   org.opencontainers.image.description: "Hardened qt-minimal builder image built on Wolfi with daily CVE patches"

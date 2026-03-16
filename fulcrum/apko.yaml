@@ -23,6 +23,9 @@ entrypoint:
 
 work-dir: /data
 
+environment:
+  LANG: C.UTF-8
+
 paths:
   - path: /data
     type: directory
