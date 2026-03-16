@@ -13,21 +13,16 @@ environment:
     keyring:
       - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
-      - busybox
       - build-base
-      - wget
 
 pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/miniupnp/miniupnp.git
+      tag: miniupnpc_2_3_3
+
   - runs: |
-      set -euo pipefail
-
-      VER="${{package.version}}"
-      TAG="miniupnpc_${VER//./_}"
-
-      wget -q "https://github.com/miniupnp/miniupnp/releases/download/${TAG}/miniupnpc-${VER}.tar.gz"
-      tar xzf "miniupnpc-${VER}.tar.gz"
-
-      cd "miniupnpc-${VER}"
+      cd ${{package.name}}
       make -j"$(nproc)"
       make DESTDIR="${{targets.destdir}}" INSTALLPREFIX=/usr install
 
