@@ -1,6 +1,6 @@
 package:
   name: bitcoin-knots
-  version: 29.3.20260210
+  version: 29.3.20260210 # renovate: datasource=github-tags depName=bitcoinknots/bitcoin
   epoch: 0
   description: Bitcoin Knots daemon
   copyright:

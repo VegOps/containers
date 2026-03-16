@@ -1,6 +1,6 @@
 package:
   name: miniupnpc
-  version: 2.3.3
+  version: 2.3.3 # renovate: datasource=github-tags depName=miniupnp/miniupnp
   epoch: 0
   description: Lightweight UPnP client library and tools
   copyright:
@@ -19,8 +19,7 @@ pipeline:
   - uses: git-checkout
     with:
       repository: https://github.com/miniupnp/miniupnp.git
-      tag: miniupnpc_2_3_3
-
+      tag: miniupnpc_2_3_3 # renovate: datasource=github-tags depName=miniupnp/miniupnp
   - runs: |
       cd ${{package.name}}
       make -j"$(nproc)"

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "groupName": "github-actions",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "automerge": true
+    },
+    {
+      "matchDatasources": [
+        "github-releases",
+        "github-tags"
+      ],
+      "matchPackageNames": [
+        "chainguard-dev/melange",
+        "chainguard-dev/apko"
+      ],
+      "groupName": "wolfi-tools"
+    },
+    {
+      "matchPackageNames": [
+        "miniupnp/miniupnp"
+      ],
+      "versioning": "regex:^(?:miniupnpc_)?(?<major>\\d+)[._](?<minor>\\d+)[._](?<patch>\\d+)$"
+    },
+    {
+      "matchPackageNames": [
+        "lightningnetwork/lnd"
+      ],
+      "extractVersion": "^v(?<version>.*)$",
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:[_-](?<prerelease>.*))?$"
+    },
+    {
+      "matchPackageNames": [
+        "bitcoinknots/bitcoin"
+      ],
+      "extractVersion": "^v(?<version>.*)$",
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?:knots|\\.)(?<patch>\\d+)$"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Comment-based updates for melange.yaml (centralized logic)",
+      "fileMatch": [
+        "(^|/)melange\\.yaml$"
+      ],
+      "matchStrings": [
+        "(?<part>version|tag):\\s*[\"']?(?<currentValue>[^\\s#\\n\"']+)[\"']?\\s*# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Automatic updates for simple melange.yaml files",
+      "fileMatch": [
+        "(^|/)melange\\.yaml$"
+      ],
+      "matchStrings": [
+        "version:\\s*[\"']?(?<currentValue>[^\\s#\\n\"']+)[\"']?[\\s\\S]*?github:\\s*identifier:\\s*[\"']?(?<depName>[^\\s\\n#\"']+)[\"']?"
+      ],
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^v?(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Update pinned MELANGE_VERSION and APKO_VERSION in build workflow",
+      "fileMatch": [
+        "^\\.github/workflows/build\\.yaml$"
+      ],
+      "matchStrings": [
+        "(?<depNameTemplate>MELANGE|APKO)_VERSION: (?<currentValue>\\S+) # renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)"
+      ]
+    }
+  ]
+}
