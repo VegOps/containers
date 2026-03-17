@@ -6,7 +6,15 @@ package:
   copyright:
     - license: MIT
 
+var-transforms:
+  - from: ${{package.version}}
+    match: ^([0-9]+)\.([0-9]+)\.([0-9]+)$
+    replace: ${1}.${2}.knots${3}
+    to: upstream-version
+
 environment:
+  environment:
+    BITCOIN_GENBUILD_NO_GIT: "1"
   contents:
     repositories:
       - https://packages.wolfi.dev/os
@@ -18,45 +26,30 @@ environment:
       - cmake
       - linux-headers
       - pkgconf
-      - python3
       - libevent-dev
       - boost-dev
       - zeromq-dev
       - libzmq-static
       - gpg
       - gpg-agent
-      - wget
       - curl
       - jq
 
 pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/bitcoinknots/bitcoin.git
+      tag: v${{vars.upstream-version}}
+
   - runs: |
-      set -euo pipefail
-      VER="${{package.version}}"
-      UPSTREAM_VER="${VER%.*}.knots${VER##*.}"
-
-      wget "https://bitcoinknots.org/files/${UPSTREAM_VER%%.*}.x/${UPSTREAM_VER}/bitcoin-${UPSTREAM_VER}.tar.gz" \
-      "https://bitcoinknots.org/files/${UPSTREAM_VER%%.*}.x/${UPSTREAM_VER}/SHA256SUMS.asc" \
-      "https://bitcoinknots.org/files/${UPSTREAM_VER%%.*}.x/${UPSTREAM_VER}/SHA256SUMS" \
-      || \
-      wget "https://github.com/bitcoinknots/bitcoin/releases/download/v${UPSTREAM_VER}/bitcoin-${UPSTREAM_VER}.tar.gz" \
-      "https://github.com/bitcoinknots/bitcoin/releases/download/v${UPSTREAM_VER}/SHA256SUMS.asc" \
-      "https://github.com/bitcoinknots/bitcoin/releases/download/v${UPSTREAM_VER}/SHA256SUMS"
-
       export GNUPGHOME="$(mktemp -d)"
       trap 'rm -rf "$GNUPGHOME"' EXIT
 
       curl -s "https://api.github.com/repos/bitcoinknots/guix.sigs/contents/builder-keys" | jq -r '.[].download_url' | while read url; do curl -s "$url" | gpg --import; done
-      gpg --verify SHA256SUMS.asc SHA256SUMS
 
-      [ -f SHA256SUMS ] && cp SHA256SUMS sha256sums || cp SHA256SUMS.asc sha256sums
+      git verify-tag "v${{vars.upstream-version}}"
 
-      grep " bitcoin-${UPSTREAM_VER}.tar.gz$" SHA256SUMS | sha256sum -c -
-
-      tar xzf "bitcoin-${UPSTREAM_VER}.tar.gz"
-      cd "bitcoin-${UPSTREAM_VER}"
-
-      export BITCOIN_GENBUILD_NO_GIT=1
+  - runs: |
       cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
@@ -88,11 +81,12 @@ pipeline:
 
       cmake --build build -j "$(nproc)"
 
-      strip build/bin/bitcoind build/bin/bitcoin-cli build/bin/bitcoin-tx
       mkdir -p "${{targets.destdir}}/usr/bin"
       cp build/bin/bitcoind "${{targets.destdir}}/usr/bin/bitcoind"
       cp build/bin/bitcoin-cli "${{targets.destdir}}/usr/bin/bitcoin-cli"
       cp build/bin/bitcoin-tx "${{targets.destdir}}/usr/bin/bitcoin-tx"
+
+  - uses: strip
 
 update:
   enabled: true

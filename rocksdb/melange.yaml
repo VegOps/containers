@@ -17,10 +17,10 @@ environment:
       - busybox
       - build-base
       - clang
-      - git
       - linux-headers
       - make
       - perl
+      - posix-libc-utils # getconf
       - snappy-dev
 
 pipeline:

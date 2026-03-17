@@ -30,8 +30,6 @@ pipeline:
   - runs: |
       make USE_UPNP=yes -j$(nproc)
 
-      strip i2pd
-
       mkdir -p "${{targets.destdir}}/usr/bin"
       cp i2pd "${{targets.destdir}}/usr/bin/i2pd"
 
@@ -44,6 +42,8 @@ pipeline:
       # Patch config for container use
       sed -i 's/^log = file/log = stdout/' "${{targets.destdir}}/etc/i2pd/i2pd.conf"
       sed -i 's/^loglevel = none/loglevel = error/' "${{targets.destdir}}/etc/i2pd/i2pd.conf"
+
+  - uses: strip
 
 update:
   enabled: true

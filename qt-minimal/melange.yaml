@@ -67,11 +67,7 @@ pipeline:
       cmake --build build --parallel $(nproc)
       DESTDIR="${{targets.destdir}}" cmake --install build
 
-  - runs: |
-      strip --strip-unneeded "${{targets.destdir}}"/usr/bin/androiddeployqt*
-      strip --strip-unneeded "${{targets.destdir}}"/usr/bin/qmake*
-      strip --strip-unneeded "${{targets.destdir}}"/usr/bin/qtp*
-      strip --strip-unneeded "${{targets.destdir}}"/usr/lib/libQt6*.a
+  - uses: strip
 
 update:
   enabled: true

@@ -6,6 +6,12 @@ package:
   copyright:
     - license: BSD-3-Clause
 
+var-transforms:
+  - from: ${{package.version}}
+    match: \.
+    replace: _
+    to: upstream-version
+
 environment:
   contents:
     repositories:
@@ -19,7 +25,8 @@ pipeline:
   - uses: git-checkout
     with:
       repository: https://github.com/miniupnp/miniupnp.git
-      tag: miniupnpc_2_3_3 # renovate: datasource=github-tags depName=miniupnp/miniupnp
+      tag: miniupnpc_${{vars.upstream-version}}
+
   - runs: |
       cd ${{package.name}}
       make -j"$(nproc)"

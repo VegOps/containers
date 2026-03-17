@@ -6,7 +6,15 @@ package:
   copyright:
     - license: MIT
 
+var-transforms:
+  - from: ${{package.version}}
+    match: _
+    replace: "-"
+    to: upstream-version
+
 environment:
+  environment:
+    GOPATH: /tmp/go
   contents:
     repositories:
       - https://packages.wolfi.dev/os
@@ -24,12 +32,9 @@ pipeline:
   - uses: git-checkout
     with:
       repository: https://github.com/lightningnetwork/lnd.git
-      tag: v0.20.1-beta
+      tag: v${{vars.upstream-version}}
 
   - runs: |
-      VER="${{package.version}}"
-      UPSTREAM_VER="${VER/_/-}"
-
       wget -qO roasbeef.asc "https://raw.githubusercontent.com/lightningnetwork/lnd/master/scripts/keys/roasbeef.asc"
 
       export GNUPGHOME="$(mktemp -d)"
@@ -37,10 +42,9 @@ pipeline:
 
       gpg --import roasbeef.asc
       
-      git verify-tag v$UPSTREAM_VER
+      git verify-tag "v${{vars.upstream-version}}"
 
   - runs: |
-      GOPATH="/tmp/go" \
       NO_PROXY="*" \
       make release-install
 
@@ -48,7 +52,7 @@ pipeline:
       cp /tmp/go/bin/lncli "${{targets.destdir}}/usr/bin/lncli"
       cp /tmp/go/bin/lnd   "${{targets.destdir}}/usr/bin/lnd"
 
-      strip "${{targets.destdir}}/usr/bin/lncli" "${{targets.destdir}}/usr/bin/lnd"
+  - uses: strip
 
 update:
   enabled: true

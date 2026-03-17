@@ -6,14 +6,6 @@ package:
   copyright:
     - license: GPL-3.0
 
-update:
-  enabled: true
-  github:
-    identifier: cculianu/Fulcrum
-    use-tag: true
-    tag-filter-prefix: v2.1.
-    strip-prefix: v
-
 environment:
   contents:
     repositories:
@@ -51,7 +43,16 @@ pipeline:
 
       make -j "$(nproc)"
 
-      strip Fulcrum
       mkdir -p "${{targets.destdir}}/usr/bin"
       cp Fulcrum "${{targets.destdir}}/usr/bin/Fulcrum"
       cp FulcrumAdmin "${{targets.destdir}}/usr/bin/FulcrumAdmin"
+
+  - uses: strip
+
+update:
+  enabled: true
+  github:
+    identifier: cculianu/Fulcrum
+    use-tag: true
+    tag-filter-prefix: v2.1.
+    strip-prefix: v
