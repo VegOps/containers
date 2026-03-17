@@ -5,15 +5,9 @@
 <h1 align="center">VegOps Containers</h1>
 
 <p align="center">
-  <a href="https://github.com/vegops/containers/actions/workflows/build.yaml">
-    <img src="https://github.com/vegops/containers/actions/workflows/build.yaml/badge.svg" alt="Build Status">
-  </a>
-  <a href="https://vegops.sh/containers/">
-    <img src="https://img.shields.io/badge/CVE-Dashboard-blue" alt="CVE Dashboard">
-  </a>
-  <a href="https://github.com/vegops/containers/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/vegops/containers" alt="License">
-  </a>
+  <a href="https://github.com/vegops/containers/actions/workflows/build.yaml"><img src="https://github.com/vegops/containers/actions/workflows/build.yaml/badge.svg" alt="Build Status"></a>
+  <a href="https://vegops.sh/containers/"><img src="https://img.shields.io/badge/CVE-Dashboard-blue" alt="CVE Dashboard"></a>
+  <a href="https://github.com/vegops/containers/blob/main/LICENSE"><img src="https://img.shields.io/github/license/vegops/containers" alt="License"></a>
 </p>
 
 <p align="center">
