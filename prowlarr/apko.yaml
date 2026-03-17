@@ -1,0 +1,66 @@
+contents:
+  repositories:
+    - https://packages.wolfi.dev/os
+  keyring:
+    - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+  packages:
+    - wolfi-baselayout
+    - ca-certificates-bundle
+    - glibc
+    - glibc-locale-posix
+    - icu
+    - ld-linux
+    - libcrypto3
+    - libgcc
+    - libssl3
+    - libstdc++
+    - libunwind
+    - libxcrypt
+    - lttng-ust
+    - sqlite-libs
+    - zlib
+    - prowlarr
+
+accounts:
+  groups:
+    - groupname: nonroot
+      gid: 65532
+  users:
+    - username: nonroot
+      uid: 65532
+      gid: 65532
+  run-as: "65532"
+
+entrypoint:
+  command: /usr/lib/prowlarr/Prowlarr
+
+cmd: -nobrowser -data=/config
+
+work-dir: /config
+
+environment:
+  HOME: /config
+  TZ: UTC
+
+paths:
+  - path: /config
+    type: directory
+    uid: 65532
+    gid: 65532
+    permissions: 0o755
+  - path: /tmp
+    type: directory
+    uid: 65532
+    gid: 65532
+    permissions: 0o1777
+
+annotations:
+  org.opencontainers.image.title: "prowlarr"
+  org.opencontainers.image.description: "Hardened Prowlarr image built on Wolfi with daily CVE patches"
+  org.opencontainers.image.url: "https://github.com/vegops/containers"
+  org.opencontainers.image.source: "https://github.com/vegops/containers/tree/main/prowlarr"
+  org.opencontainers.image.licenses: "GPL-3.0"
+
+archs:
+  - x86_64
+  - aarch64

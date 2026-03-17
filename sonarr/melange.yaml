@@ -1,0 +1,78 @@
+package:
+  name: sonarr
+  version: 4.0.16.2944 # renovate: datasource=github-releases depName=Sonarr/Sonarr
+  epoch: 0
+  description: TV show collection manager for Usenet and BitTorrent users
+  copyright:
+    - license: GPL-3.0
+  options:
+    no-depends: true
+
+vars:
+  dotnet-sdk-version: "10"
+
+environment:
+  environment:
+    BRANCH: "v${{package.version}}"
+    SONARR_VERSION: "${{package.version}}"
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - bash
+      - build-base
+      - busybox
+      - ca-certificates-bundle
+      - dotnet-10-sdk
+      - nodejs
+      - pnpm
+      - yarn
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/Sonarr/Sonarr.git
+      tag: v${{package.version}}
+
+  - runs: |
+      case "${{build.arch}}" in
+        x86_64)  rid="linux-x64" ;;
+        aarch64) rid="linux-arm64" ;;
+      esac
+
+      echo '{"sdk":{"version":"${{vars.dotnet-sdk-version}}"}}' > global.json
+      sed -i 's#<TreatWarningsAsErrors>true</TreatWarningsAsErrors>#<TreatWarningsAsErrors>false</TreatWarningsAsErrors>#' src/Directory.Build.props
+
+      ./build.sh \
+        --backend \
+        --frontend \
+        --packages \
+        -f net6.0 \
+        -r "${rid}"
+
+      mkdir -p "${{targets.destdir}}/usr/lib/sonarr" "${{targets.destdir}}/usr/bin"
+      cp -a "_artifacts/${rid}/net6.0/Sonarr/." "${{targets.destdir}}/usr/lib/sonarr/"
+
+      # In containers we do not use the in-app updater, debug symbols, or source maps.
+      rm -rf "${{targets.destdir}}/usr/lib/sonarr/Sonarr.Update"
+      find "${{targets.destdir}}/usr/lib/sonarr" -type f \( -name '*.pdb' -o -name '*.js.map' \) -delete
+      rm -f \
+        "${{targets.destdir}}/usr/lib/sonarr/ServiceInstall" \
+        "${{targets.destdir}}/usr/lib/sonarr/ServiceUninstall" \
+        "${{targets.destdir}}/usr/lib/sonarr/ServiceInstall."* \
+        "${{targets.destdir}}/usr/lib/sonarr/ServiceUninstall."* \
+        "${{targets.destdir}}/usr/lib/sonarr/createdump" \
+        "${{targets.destdir}}/usr/lib/sonarr/libmscordaccore.so" \
+        "${{targets.destdir}}/usr/lib/sonarr/libmscordbi.so"
+
+  - uses: strip
+
+update:
+  enabled: true
+  github:
+    identifier: Sonarr/Sonarr
+    use-tag: true
+    tag-filter-prefix: v4.0.
+    strip-prefix: v
