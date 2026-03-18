@@ -17,9 +17,9 @@ environment:
     GOPATH: /tmp/go
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - build-base
       - busybox
@@ -64,3 +64,23 @@ update:
   version-transform:
     - match: "-"
       replace: _
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - apk-tools
+        - busybox
+        - posix-libc-utils
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic test
+      runs: |
+        lnd --version >/dev/null 2>&1 || \
+        lnd --help >/dev/null 2>&1
+        lncli --version >/dev/null 2>&1 || \
+        lncli --help >/dev/null 2>&1

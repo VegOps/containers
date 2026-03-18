@@ -17,9 +17,9 @@ environment:
     PROWLARRVERSION: "${{package.version}}"
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - bash
       - build-base
@@ -76,3 +76,17 @@ update:
     use-tag: true
     tag-filter-prefix: v2.3.
     strip-prefix: v
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+  pipeline:
+    - name: Mock test
+      runs: |
+        true

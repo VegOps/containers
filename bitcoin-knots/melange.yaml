@@ -17,9 +17,9 @@ environment:
     BITCOIN_GENBUILD_NO_GIT: "1"
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - busybox
       - build-base
@@ -98,3 +98,25 @@ update:
   version-transform:
     - match: \.knots
       replace: .
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - apk-tools
+        - busybox
+        - posix-libc-utils
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic bitcoin command test
+      runs: |
+        bitcoind --version >/dev/null 2>&1 || \
+        bitcoind --help >/dev/null 2>&1
+        bitcoin-cli --version >/dev/null 2>&1 || \
+        bitcoin-cli --help >/dev/null 2>&1
+        bitcoin-tx --version >/dev/null 2>&1 || \
+        bitcoin-tx --help >/dev/null 2>&1

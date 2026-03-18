@@ -9,9 +9,9 @@ package:
 environment:
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - busybox
       - build-base
@@ -56,3 +56,23 @@ update:
     use-tag: true
     tag-filter-prefix: v2.1.
     strip-prefix: v
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - apk-tools
+        - busybox
+        - posix-libc-utils
+        - ${{package.name}}=${{package.full-version}}
+
+        - python3 # FulcrumAdmin requires Python 3 to run
+  pipeline:
+    - name: Basic Fulcrum command test
+      runs: |
+        Fulcrum --help >/dev/null 2>&1
+        FulcrumAdmin --help >/dev/null 2>&1

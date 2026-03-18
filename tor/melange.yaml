@@ -9,9 +9,9 @@ package:
 environment:
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - autoconf
       - automake
@@ -62,3 +62,22 @@ update:
   git:
     tag-filter-prefix: tor-0.4.
     strip-prefix: tor-
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - apk-tools
+        - busybox
+        - posix-libc-utils
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - runs: |
+        tor --version
+        test -x /usr/bin/tor-resolve
+        test -x /usr/bin/tor-gencert
+        test -x /usr/bin/tor-print-ed-signing-cert

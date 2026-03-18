@@ -9,9 +9,9 @@ package:
 environment:
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - busybox
       - build-base
@@ -51,3 +51,21 @@ update:
     identifier: PurpleI2P/i2pd
     use-tag: true
     tag-filter-prefix: 2.59.
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - apk-tools
+        - busybox
+        - posix-libc-utils
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic i2pd command test
+      runs: |
+        i2pd --help >/dev/null 2>&1 || \
+        i2pd --version >/dev/null 2>&1

@@ -15,9 +15,9 @@ var-transforms:
 environment:
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - build-base
 
@@ -40,6 +40,22 @@ subpackages:
         - miniupnpc=${{package.full-version}}
     pipeline:
       - uses: split/dev
+    test:
+      environment:
+        contents:
+          repositories:
+            - *wolfi-repository
+          keyring:
+            - *wolfi-keyring
+          packages:
+            - busybox
+            - ${{package.name}}-dev=${{package.full-version}}
+      pipeline:
+        - name: Basic test
+          runs: |
+            test -f /usr/include/miniupnpc/miniupnpc.h
+            test -e /usr/lib/pkgconfig/miniupnpc.pc || \
+            test -e /usr/share/pkgconfig/miniupnpc.pc
 
 update:
   enabled: true
@@ -51,3 +67,21 @@ update:
   version-transform:
     - match: ^([0-9]+)_([0-9]+)_([0-9]+)$
       replace: ${1}.${2}.${3}
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - apk-tools
+        - busybox
+        - posix-libc-utils
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic test
+      runs: |
+        upnpc --version >/dev/null 2>&1 || \
+        upnpc --help >/dev/null 2>&1

@@ -9,9 +9,9 @@ package:
 environment:
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - bash
       - busybox
@@ -52,3 +52,18 @@ update:
     use-tag: true
     tag-filter-prefix: v10.10.
     strip-prefix: v
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - runs: |
+        test -s /usr/lib/librocksdb.a
+        test -f /usr/include/rocksdb/db.h

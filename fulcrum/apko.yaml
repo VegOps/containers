@@ -6,6 +6,7 @@ contents:
   packages:
     - wolfi-baselayout
     - ca-certificates-bundle
+    - python3 # FulcrumAdmin requires Python 3 to run
     - fulcrum
 
 accounts:

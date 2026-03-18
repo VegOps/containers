@@ -9,9 +9,9 @@ package:
 environment:
   contents:
     repositories:
-      - https://packages.wolfi.dev/os
+      - &wolfi-repository https://packages.wolfi.dev/os
     keyring:
-      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
       - build-base
       - busybox
@@ -76,3 +76,21 @@ update:
     use-tag: true
     tag-filter-prefix: v6.10.
     strip-prefix: v
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - apk-tools
+        - busybox
+        - posix-libc-utils
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic test
+      runs: |
+        qmake --version >/dev/null 2>&1 || \
+        qmake --help >/dev/null 2>&1
