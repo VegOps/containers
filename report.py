@@ -225,6 +225,46 @@ page = f"""<!DOCTYPE html>
       flex-wrap: wrap;
       gap: 0.75rem;
     }}
+
+    .image-summary {{
+      list-style: none;
+      cursor: pointer;
+    }}
+
+    .image-summary::-webkit-details-marker {{
+      display: none;
+    }}
+
+    .image-summary::marker {{
+      content: "";
+    }}
+
+    .image-summary:hover {{
+      background: rgba(15, 23, 42, 0.55);
+    }}
+
+    .toggle-icon {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      transition: transform 0.2s ease, color 0.2s ease;
+    }}
+
+    .toggle-spacer {{
+      display: block;
+      width: 1.5rem;
+      height: 1.5rem;
+      flex-shrink: 0;
+    }}
+
+    .image-section details[open] .toggle-icon {{
+      transform: rotate(90deg);
+      color: var(--accent);
+    }}
     
     .image-section h2 {{ 
       color: var(--text); 
@@ -387,8 +427,10 @@ page = f"""<!DOCTYPE html>
     .badge-unknown {{ background: var(--unknown-bg); color: var(--unknown); border: 1px solid rgba(100, 116, 139, 0.2); }}
     
     .image-title-wrapper {{
-      display: flex;
+      display: grid;
+      grid-template-columns: 1.5rem minmax(0, auto);
       align-items: center;
+      column-gap: 0.75rem;
       flex: 1;
       min-width: 200px;
     }}
@@ -423,6 +465,18 @@ page = f"""<!DOCTYPE html>
       box-shadow: 0 0 8px currentColor;
       animation: pulse 2s infinite;
     }}
+
+    .image-collapsible {{
+      display: block;
+    }}
+
+    .image-collapsible:not([open]) .image-summary {{
+      border-bottom: none;
+    }}
+
+    .image-header-static {{
+      border-bottom: none;
+    }}
     
     @keyframes pulse {{
       0% {{ opacity: 1; }}
@@ -455,22 +509,28 @@ for name in sorted(apps.keys()):
     has_issues = len(vulns) > 0
     status_class = "has-issues" if has_issues else ""
     status_text = f"{len(vulns)} Issues" if has_issues else "Clean"
-    
-    page += f'''
-    <div class="image-section">
-      <div class="image-header">
-        <div class="image-title-wrapper">
-          <h2>{html.escape(name)}</h2>
-        </div>
-        <div class="status-badge {status_class}">
-          <div class="status-dot"></div>
-          {status_text}
-        </div>
+
+    header_html = f'''
+      <div class="image-title-wrapper">
+        {'<span class="toggle-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>' if has_issues else '<span class="toggle-spacer" aria-hidden="true"></span>'}
+        <h2>{html.escape(name)}</h2>
+      </div>
+      <div class="status-badge {status_class}">
+        <div class="status-dot"></div>
+        {status_text}
       </div>
     '''
-    
+
+    page += '<div class="image-section">'
+
     if vulns:
         vulns.sort(key=lambda v: severity_order.get(v["severity"], 99))
+        page += f'''
+        <details class="image-collapsible">
+          <summary class="image-header image-summary">
+            {header_html}
+          </summary>
+        '''
         page += '''
         <div class="table-wrapper">
           <table>
@@ -505,7 +565,13 @@ for name in sorted(apps.keys()):
                 <td data-label="Description" class="description" title="{html.escape(v.get('description', ''))}">{desc}</td>
               </tr>
             '''
-        page += "</tbody></table></div>"
+        page += "</tbody></table></div></details>"
+    else:
+        page += f'''
+      <div class="image-header image-header-static">
+        {header_html}
+      </div>
+    '''
     page += "</div>"
     
 page += "</div></body></html>"
