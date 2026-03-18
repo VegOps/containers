@@ -1,0 +1,97 @@
+package:
+  name: vaultwarden
+  version: 1.35.4 # renovate: datasource=github-releases depName=dani-garcia/vaultwarden
+  epoch: 0
+  description: Unofficial Bitwarden-compatible server written in Rust
+  copyright:
+    - license: AGPL-3.0-only
+
+vars:
+  web-vault-version: v2026.1.1 # renovate: datasource=docker depName=vaultwarden/web-vault
+
+environment:
+  contents:
+    repositories:
+      - &wolfi-repository https://packages.wolfi.dev/os
+    keyring:
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - bash
+      - build-base
+      - busybox
+      - crane
+      - curl
+      - jq
+      - mariadb-connector-c-dev
+      - openssl-dev
+      - pkgconf
+      - postgresql-18-dev
+      - python3
+      - rust
+      - sqlite-dev
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/dani-garcia/vaultwarden.git
+      tag: ${{package.version}}
+
+  - runs: |
+      python3 - <<'PY'
+      from pathlib import Path
+
+      cargo = Path("Cargo.toml")
+      contents = cargo.read_text()
+      old = 'libsqlite3-sys = { version = "0.35.0", features = ["bundled"], optional = true }'
+      new = 'libsqlite3-sys = { version = "0.35.0", optional = true }'
+      if old not in contents:
+          raise SystemExit("expected bundled sqlite configuration not found")
+      cargo.write_text(contents.replace(old, new, 1))
+      PY
+
+      export CARGO_HOME="${PWD}/.cargo"
+      export CARGO_TARGET_DIR="${PWD}/target"
+      export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
+      export VW_VERSION="${{package.version}}"
+
+      cargo build \
+        --release \
+        --features sqlite,mysql,postgresql
+
+      web_vault_digest="$(curl -fsSL "https://hub.docker.com/v2/repositories/vaultwarden/web-vault/tags/${{vars.web-vault-version}}" | jq -r '.digest')"
+      test -n "${web_vault_digest}" && test "${web_vault_digest}" != "null"
+
+      tmpweb="$(mktemp -d)"
+      crane export "docker.io/vaultwarden/web-vault@${web_vault_digest}" - | tar -x -C "${tmpweb}" web-vault
+      find "${tmpweb}/web-vault" -type f -name '*.map' -delete
+
+      install -Dm755 target/release/vaultwarden "${{targets.destdir}}/usr/bin/vaultwarden"
+      mkdir -p "${{targets.destdir}}/usr/share/vaultwarden"
+      cp -a "${tmpweb}/web-vault" "${{targets.destdir}}/usr/share/vaultwarden/"
+      install -Dm644 LICENSE.txt "${{targets.destdir}}/usr/share/licenses/vaultwarden/LICENSE.txt"
+      mkdir -p "${{targets.destdir}}/data"
+
+  - uses: strip
+
+update:
+  enabled: true
+  github:
+    identifier: dani-garcia/vaultwarden
+    use-tag: true
+    tag-filter-prefix: 1.35.
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic vaultwarden package test
+      runs: |
+        test -x /usr/bin/vaultwarden
+        test -f /usr/share/vaultwarden/web-vault/index.html
