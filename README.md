@@ -44,6 +44,7 @@
 | `ghcr.io/vegops/radarr`        | Radarr movie manager     | Compiled from source (.NET + yarn) |
 | `ghcr.io/vegops/rocksdb`       | RocksDB static library   | Compiled from source (make)        |
 | `ghcr.io/vegops/sonarr`        | Sonarr TV manager        | Compiled from source (.NET + yarn) |
+| `ghcr.io/vegops/sqlite`        | SQLite CLI               | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/tor`           | Tor anonymity network    | Compiled from source (autoconf)    |
 
 ### Verify Image Signatures
