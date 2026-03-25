@@ -267,10 +267,8 @@ jobs:
 
             melange test "$pkg/melange.yaml" \
               --arch "${{ matrix.arch }}" \
-              --signing-key melange.rsa \
               --repository-append ./packages \
-              --keyring-append ./melange.rsa.pub \
-              --runner docker
+              --keyring-append ./melange.rsa.pub
           done
 
       - name: Upload packages

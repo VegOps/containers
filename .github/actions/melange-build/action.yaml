@@ -88,13 +88,10 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        chmod 600 melange.rsa
         melange test "${{ inputs.package-name }}/melange.yaml" \
           --arch "${{ inputs.arch }}" \
-          --signing-key melange.rsa \
           --repository-append ./packages \
-          --keyring-append ./melange.rsa.pub \
-          --runner docker
+          --keyring-append ./melange.rsa.pub
 
     - name: Upload packages
       uses: actions/upload-artifact@v7
