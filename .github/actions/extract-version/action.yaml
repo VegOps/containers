@@ -1,0 +1,28 @@
+name: Extract package version
+description: Extract an OCI tag from melange.yaml or fall back to latest
+
+inputs:
+  package-name:
+    description: Package directory name
+    required: true
+
+outputs:
+  tag:
+    description: Package tag
+    value: ${{ steps.extract.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Extract version
+      id: extract
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -f "${{ inputs.package-name }}/melange.yaml" ]; then
+          pkg_version=$(awk '/^  version:/ {print $2; exit}' "${{ inputs.package-name }}/melange.yaml")
+          pkg_epoch=$(awk '/^  epoch:/ {print $2; exit}' "${{ inputs.package-name }}/melange.yaml")
+          echo "tag=${pkg_version}-r${pkg_epoch}" >> "$GITHUB_OUTPUT"
+        else
+          echo "tag=latest" >> "$GITHUB_OUTPUT"
+        fi

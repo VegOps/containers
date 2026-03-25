@@ -41,41 +41,100 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       base_packages: ${{ steps.set.outputs.base_packages }}
-      app_packages: ${{ steps.set.outputs.app_packages }}
+      deps_build_order: ${{ steps.set.outputs.deps_build_order }}
       apko_images: ${{ steps.set.outputs.apko_images }}
     steps:
       - uses: actions/checkout@v6
 
       - id: set
+        shell: bash
         run: |
-          ALL_APKO=$(find . -maxdepth 2 -name apko.yaml | sed 's|^\./||; s|/apko.yaml$||' | sort -u)
-          ALL_MELANGE=$(find . -maxdepth 2 -name melange.yaml | sed 's|^\./||; s|/melange.yaml$||' | sort -u)
+          set -euo pipefail
 
-          BASE_PACKAGES=""
-          APP_PACKAGES=""
+          mapfile -t all_apko < <(find . -maxdepth 2 -name apko.yaml | sed 's|^\./||; s|/apko.yaml$||' | sort -u)
+          mapfile -t all_melange < <(find . -maxdepth 2 -name melange.yaml | sed 's|^\./||; s|/melange.yaml$||' | sort -u)
 
-          for pkg in $ALL_MELANGE; do
-            HAS_DEP=false
-            for dep in $ALL_MELANGE; do
-              if [ "$pkg" != "$dep" ]; then
-                # Match dependencies allowing -dev, -static, etc subpackages
-                if grep -E -q "^[[:space:]]+-[[:space:]]+${dep}(-.*)?$" "$pkg/melange.yaml" || grep -E -q "^[[:space:]]+-[[:space:]]+${dep}(-.*)?=" "$pkg/melange.yaml"; then
-                  HAS_DEP=true
-                  break
-                fi
+          json_array() {
+            if [ "$#" -eq 0 ]; then
+              printf '[]'
+            else
+              printf '%s\n' "$@" | jq -R -s -c 'split("\n") | map(select(length > 0))'
+            fi
+          }
+
+          declare -A deps_of
+          for pkg in "${all_melange[@]}"; do
+            pkg_deps=""
+            for dep in "${all_melange[@]}"; do
+              if [ "$pkg" != "$dep" ] && grep -E -q "^[[:space:]]+-[[:space:]]+${dep}(-.*)?(=.*)?$" "$pkg/melange.yaml"; then
+                pkg_deps="$pkg_deps $dep"
               fi
             done
-            
-            if [ "$HAS_DEP" = true ]; then
-              APP_PACKAGES="$APP_PACKAGES $pkg"
+            deps_of["$pkg"]="${pkg_deps# }"
+          done
+
+          base_packages=()
+          dep_packages=()
+          for pkg in "${all_melange[@]}"; do
+            if [ -n "${deps_of[$pkg]}" ]; then
+              dep_packages+=("$pkg")
             else
-              BASE_PACKAGES="$BASE_PACKAGES $pkg"
+              base_packages+=("$pkg")
             fi
           done
 
-          echo "base_packages=$(echo $BASE_PACKAGES | awk '{$1=$1}1' | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length>0))')" >> $GITHUB_OUTPUT
-          echo "app_packages=$(echo $APP_PACKAGES | awk '{$1=$1}1' | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length>0))')" >> $GITHUB_OUTPUT
-          echo "apko_images=$(echo $ALL_APKO | awk '{$1=$1}1' | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length>0))')" >> $GITHUB_OUTPUT
+          declare -A resolved
+          for pkg in "${base_packages[@]}"; do
+            resolved["$pkg"]=1
+          done
+
+          sorted_deps=()
+          remaining=("${dep_packages[@]}")
+          max_iter=${#dep_packages[@]}
+          iter=0
+
+          while [ "${#remaining[@]}" -gt 0 ]; do
+            ((iter += 1))
+            if [ "$iter" -gt "$max_iter" ]; then
+              echo "::error::Circular dependency: ${remaining[*]}"
+              exit 1
+            fi
+
+            progress=false
+            next=()
+            for pkg in "${remaining[@]}"; do
+              all_ok=true
+              for dep in ${deps_of[$pkg]}; do
+                if [ -z "${resolved[$dep]+x}" ]; then
+                  all_ok=false
+                  break
+                fi
+              done
+
+              if [ "$all_ok" = true ]; then
+                sorted_deps+=("$pkg")
+                resolved["$pkg"]=1
+                progress=true
+              else
+                next+=("$pkg")
+              fi
+            done
+
+            if [ "$progress" = false ]; then
+              echo "::error::Circular dependency: ${next[*]}"
+              exit 1
+            fi
+
+            remaining=("${next[@]}")
+          done
+
+          echo "base_packages=$(json_array "${base_packages[@]}")" >> "$GITHUB_OUTPUT"
+          echo "deps_build_order=$(json_array "${sorted_deps[@]}")" >> "$GITHUB_OUTPUT"
+          echo "apko_images=$(json_array "${all_apko[@]}")" >> "$GITHUB_OUTPUT"
+
+          echo "Base: ${base_packages[*]:-<none>}"
+          echo "Deps build order: ${sorted_deps[*]:-<none>}"
+          echo "Images: ${all_apko[*]:-<none>}"
 
   ##############################################################################
   # GENERATE EPHEMERAL SIGNING KEY (PR only - secrets not available for forks) #
@@ -84,12 +143,15 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@v6
+
       - name: Install melange
-        run: |
-          go install chainguard.dev/melange@${{ env.MELANGE_VERSION }}
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+        uses: ./.github/actions/setup-tools
+        with:
+          melange-version: ${{ env.MELANGE_VERSION }}
 
       - name: Generate ephemeral signing key
         run: |
@@ -125,69 +187,39 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install melange
-        run: |
-          go install chainguard.dev/melange@${{ env.MELANGE_VERSION }}
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
-
-      - name: Download ephemeral signing key (PR)
-        if: github.event_name == 'pull_request'
-        uses: actions/download-artifact@v8
+      - name: Build package
+        uses: ./.github/actions/melange-build
         with:
-          name: melange-ephemeral-key
-          path: .
-
-      - name: Setup signing key (protected branch)
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "${{ env.MELANGE_SIGNING_KEY }}"     > melange.rsa
-          echo "${{ env.MELANGE_SIGNING_KEY_PUB }}" > melange.rsa.pub
-          chmod 600 melange.rsa
-
-      - name: Build package with melange
-        run: |
-          chmod 600 melange.rsa
-          melange build "${{ matrix.name }}/melange.yaml" \
-            --arch "${{ matrix.arch }}" \
-            --signing-key melange.rsa \
-            --repository-append ./packages \
-            --keyring-append ./melange.rsa.pub \
-            --out-dir ./packages \
-            --runner docker
-
-      - name: Upload packages
-        uses: actions/upload-artifact@v7
-        with:
-          name: packages-${{ matrix.name }}-${{ matrix.arch }}
-          path: |
-            packages/
-            melange.rsa.pub
-          retention-days: 1
+          package-name: ${{ matrix.name }}
+          arch: ${{ matrix.arch }}
+          event-name: ${{ github.event_name }}
+          signing-key-secret: ${{ env.MELANGE_SIGNING_KEY }}
+          signing-key-pub-secret: ${{ env.MELANGE_SIGNING_KEY_PUB }}
+          melange-version: ${{ env.MELANGE_VERSION }}
 
   ##############################################################################
-  # TIER 2: BUILD APP MELANGE PACKAGES (depends on base packages)              #
+  # TIER 2: BUILD DEPENDENT MELANGE PACKAGES (topological order per arch)      #
   ##############################################################################
-  melange-build-app:
+  melange-build-deps:
     needs: [discover, keygen, melange-build-base]
-    if: always() && needs.discover.outputs.app_packages != '[]' && needs.discover.outputs.app_packages != '[""]' && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
+    if: always() && needs.discover.outputs.deps_build_order != '[]' && needs.discover.outputs.deps_build_order != '[""]' && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        name: ${{ fromJson(needs.discover.outputs.app_packages) }}
         arch: [x86_64, aarch64]
 
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    timeout-minutes: 90
+    timeout-minutes: 360
 
     steps:
       - uses: actions/checkout@v6
 
       - name: Install melange
-        run: |
-          go install chainguard.dev/melange@${{ env.MELANGE_VERSION }}
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+        uses: ./.github/actions/setup-tools
+        with:
+          melange-version: ${{ env.MELANGE_VERSION }}
 
       - name: Download ephemeral signing key (PR)
         if: github.event_name == 'pull_request'
@@ -199,39 +231,52 @@ jobs:
       - name: Setup signing key (protected branch)
         if: github.event_name != 'pull_request'
         run: |
-          echo "${{ env.MELANGE_SIGNING_KEY }}"     > melange.rsa
-          echo "${{ env.MELANGE_SIGNING_KEY_PUB }}" > melange.rsa.pub
+          set -euo pipefail
+          printf '%s\n' "${{ env.MELANGE_SIGNING_KEY }}" > melange.rsa
+          printf '%s\n' "${{ env.MELANGE_SIGNING_KEY_PUB }}" > melange.rsa.pub
           chmod 600 melange.rsa
 
-      - name: Download base packages (same arch)
+      - name: Download base packages
         uses: actions/download-artifact@v8
         with:
           pattern: packages-*-${{ matrix.arch }}
           merge-multiple: true
           path: .
 
-      - name: Re-index local packages
+      - name: Build dependent packages in topological order
+        env:
+          DEPS_BUILD_ORDER: ${{ needs.discover.outputs.deps_build_order }}
         run: |
+          set -euo pipefail
           chmod 600 melange.rsa
-          if [ -d "packages/${{ matrix.arch }}" ]; then
-            melange index --signing-key melange.rsa -o "packages/${{ matrix.arch }}/APKINDEX.tar.gz" "packages/${{ matrix.arch }}"/*.apk
-          fi
 
-      - name: Build package with melange
-        run: |
-          chmod 600 melange.rsa
-          melange build "${{ matrix.name }}/melange.yaml" \
-            --arch "${{ matrix.arch }}" \
-            --signing-key melange.rsa \
-            --repository-append ./packages \
-            --keyring-append ./melange.rsa.pub \
-            --out-dir ./packages \
-            --runner docker
+          for pkg in $(echo "$DEPS_BUILD_ORDER" | jq -r '.[]'); do
+            echo "Building $pkg for ${{ matrix.arch }}"
+
+            if [ -d "packages/${{ matrix.arch }}" ] && compgen -G "packages/${{ matrix.arch }}/*.apk" > /dev/null; then
+              melange index --signing-key melange.rsa -o "packages/${{ matrix.arch }}/APKINDEX.tar.gz" "packages/${{ matrix.arch }}"/*.apk
+            fi
+
+            melange build "$pkg/melange.yaml" \
+              --arch "${{ matrix.arch }}" \
+              --signing-key melange.rsa \
+              --repository-append ./packages \
+              --keyring-append ./melange.rsa.pub \
+              --out-dir ./packages \
+              --runner docker
+
+            melange test "$pkg/melange.yaml" \
+              --arch "${{ matrix.arch }}" \
+              --signing-key melange.rsa \
+              --repository-append ./packages \
+              --keyring-append ./melange.rsa.pub \
+              --runner docker
+          done
 
       - name: Upload packages
         uses: actions/upload-artifact@v7
         with:
-          name: packages-${{ matrix.name }}-${{ matrix.arch }}
+          name: packages-deps-${{ matrix.arch }}
           path: |
             packages/
             melange.rsa.pub
@@ -240,24 +285,24 @@ jobs:
   ##############################################################################
   # FINAL TIER: BUILD ALL IMAGES (depends on all melange packages)             #
   ##############################################################################
-  verify-images:
-    needs: [discover, melange-build-base, melange-build-app]
-    if: always() && needs.discover.outputs.apko_images != '[]' && needs.discover.outputs.apko_images != '[""]' && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped') && (needs.melange-build-app.result == 'success' || needs.melange-build-app.result == 'skipped')
+  build-images:
+    needs: [discover, melange-build-base, melange-build-deps]
+    if: always() && needs.discover.outputs.apko_images != '[]' && needs.discover.outputs.apko_images != '[""]' && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped') && (needs.melange-build-deps.result == 'success' || needs.melange-build-deps.result == 'skipped')
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         name: ${{ fromJson(needs.discover.outputs.apko_images) }}
-        arch: [x86_64, aarch64]
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install apko
-        run: |
-          go install chainguard.dev/apko@${{ env.APKO_VERSION }}
-          echo "$HOME/go/bin" >> $GITHUB_PATH
+      - name: Install build tools
+        uses: ./.github/actions/setup-tools
+        with:
+          apko-version: ${{ env.APKO_VERSION }}
+          melange-version: ${{ env.MELANGE_VERSION }}
 
       - uses: sigstore/cosign-installer@v4.1.0
 
@@ -270,37 +315,43 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download all packages
+        if: needs.discover.outputs.base_packages != '[]' || needs.discover.outputs.deps_build_order != '[]'
         uses: actions/download-artifact@v8
         with:
-          pattern: packages-*-${{ matrix.arch }}
+          pattern: packages-*-*
           merge-multiple: true
           path: .
 
-      - name: Install melange
-        run: |
-          go install chainguard.dev/melange@${{ env.MELANGE_VERSION }}
-          echo "$HOME/go/bin" >> $GITHUB_PATH
-
       - name: Setup signing key
         run: |
-          # The pub key should already exist from artifacts.
-          # For protected branches, also create it from secrets if missing.
           if [ ! -f "melange.rsa.pub" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "${{ env.MELANGE_SIGNING_KEY_PUB }}" > melange.rsa.pub
+            printf '%s\n' "${{ env.MELANGE_SIGNING_KEY_PUB }}" > melange.rsa.pub
           fi
-          # Private key needed for re-indexing
           if [ ! -f "melange.rsa" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "${{ env.MELANGE_SIGNING_KEY }}" > melange.rsa
+            printf '%s\n' "${{ env.MELANGE_SIGNING_KEY }}" > melange.rsa
             chmod 600 melange.rsa
           fi
 
-      - name: Re-index local packages and build
+      - name: Re-index local packages
         run: |
           if [ -f "melange.rsa" ]; then
-            if [ -d "packages/${{ matrix.arch }}" ]; then
-              melange index --signing-key melange.rsa -o "packages/${{ matrix.arch }}/APKINDEX.tar.gz" "packages/${{ matrix.arch }}"/*.apk
-            fi
+            for arch in x86_64 aarch64; do
+              if [ -d "packages/$arch" ] && compgen -G "packages/$arch/*.apk" > /dev/null; then
+                echo "Indexing $arch packages..."
+                melange index --signing-key melange.rsa -o "packages/$arch/APKINDEX.tar.gz" "packages/$arch"/*.apk
+              fi
+            done
           fi
+
+      - name: Extract version
+        id: version
+        uses: ./.github/actions/extract-version
+        with:
+          package-name: ${{ matrix.name }}
+
+      - name: Build image tarball (x86_64)
+        run: |
+          rm -f sbom-*.spdx.json
 
           ARGS=""
           if [ -f "melange.rsa.pub" ]; then
@@ -311,154 +362,45 @@ jobs:
           fi
 
           apko build "${{ matrix.name }}/apko.yaml" \
-            "${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:verify-${{ matrix.arch }}" \
-            "${{ matrix.name }}-${{ matrix.arch }}.tar" \
-            --arch "${{ matrix.arch }}" \
+            "${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:verify-x86_64" \
+            "${{ matrix.name }}-x86_64.tar" \
+            --arch x86_64 \
             $ARGS
 
-      - name: Scan with Grype (SARIF)
-        id: grype-sarif
-        uses: anchore/scan-action@v7
+      - name: Scan image (x86_64)
+        uses: ./.github/actions/scan-image
         with:
-          image: "docker-archive:./${{ matrix.name }}-${{ matrix.arch }}.tar"
-          output-format: sarif
-          fail-build: false
+          image-tar: "${{ matrix.name }}-x86_64.tar"
+          image-name: ${{ matrix.name }}
+          arch: x86_64
 
-      - name: Scan with Grype (JSON)
-        id: grype-json
-        uses: anchore/scan-action@v7
-        with:
-          image: "docker-archive:./${{ matrix.name }}-${{ matrix.arch }}.tar"
-          output-format: json
-          fail-build: false
-
-      - name: Rename Grype JSON report
+      - name: Build image tarball (aarch64)
         run: |
-          mv "${{ steps.grype-json.outputs.json }}" "cve-report-${{ matrix.name }}-${{ matrix.arch }}.json"
+          rm -f sbom-*.spdx.json
 
-      - name: Upload Grype SARIF
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: ${{ steps.grype-sarif.outputs.sarif }}
-          category: grype-${{ matrix.name }}-${{ matrix.arch }}
-
-      - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          input: "./${{ matrix.name }}-${{ matrix.arch }}.tar"
-          format: sarif
-          output: "trivy-results-${{ matrix.name }}-${{ matrix.arch }}.sarif"
-
-      - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: "trivy-results-${{ matrix.name }}-${{ matrix.arch }}.sarif"
-          category: "trivy-${{ matrix.name }}-${{ matrix.arch }}"
-
-      - name: Upload CVE report artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: cve-report-${{ matrix.name }}-${{ matrix.arch }}
-          path: "cve-report-${{ matrix.name }}-${{ matrix.arch }}.json"
-          retention-days: 90
-
-      - name: Upload SBOM
-        uses: actions/upload-artifact@v7
-        with:
-          name: sbom-${{ matrix.name }}-${{ matrix.arch }}
-          path: sbom-*.spdx.json
-
-      - name: Extract version
-        id: version
-        run: |
-          set -euo pipefail
-          if [ -f "${{ matrix.name }}/melange.yaml" ]; then
-            PKG_VERSION=$(awk '/^  version:/ {print $2}' "${{ matrix.name }}/melange.yaml")
-            PKG_EPOCH=$(awk '/^  epoch:/ {print $2}' "${{ matrix.name }}/melange.yaml")
-            echo "tag=${PKG_VERSION}-r${PKG_EPOCH}" >> "$GITHUB_OUTPUT"
-          else
-            # Default fallback for apko-only images
-            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          ARGS=""
+          if [ -f "melange.rsa.pub" ]; then
+            ARGS="$ARGS --keyring-append ./melange.rsa.pub"
+          fi
+          if [ -d "./packages" ]; then
+            ARGS="$ARGS --repository-append ./packages"
           fi
 
-  ##############################################################################
-  # PUBLISH AND SIGN IMAGES (matrix name)                                     #
-  ##############################################################################
-  publish:
-    needs: [discover, verify-images]
-    if: always() && github.event_name != 'pull_request' && needs.verify-images.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        name: ${{ fromJson(needs.discover.outputs.apko_images) }}
-    steps:
-      - uses: actions/checkout@v6
+          apko build "${{ matrix.name }}/apko.yaml" \
+            "${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:verify-aarch64" \
+            "${{ matrix.name }}-aarch64.tar" \
+            --arch aarch64 \
+            $ARGS
 
-      - name: Install apko
-        run: |
-          go install chainguard.dev/apko@${{ env.APKO_VERSION }}
-          echo "$HOME/go/bin" >> $GITHUB_PATH
-
-      - uses: sigstore/cosign-installer@v4.1.0
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v4
+      - name: Scan image (aarch64)
+        uses: ./.github/actions/scan-image
         with:
-          registry: ${{ env.REGISTRY_HOST }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download all packages
-        uses: actions/download-artifact@v8
-        with:
-          pattern: packages-*-*
-          merge-multiple: true
-          path: .
-
-      - name: Install melange
-        run: |
-          go install chainguard.dev/melange@${{ env.MELANGE_VERSION }}
-          echo "$HOME/go/bin" >> $GITHUB_PATH
-
-      - name: Setup signing key
-        run: |
-          if [ ! -f "melange.rsa.pub" ]; then
-            echo "${{ env.MELANGE_SIGNING_KEY_PUB }}" > melange.rsa.pub
-          fi
-          if [ ! -f "melange.rsa" ]; then
-            echo "${{ env.MELANGE_SIGNING_KEY }}" > melange.rsa
-            chmod 600 melange.rsa
-          fi
-
-      - name: Extract version
-        id: version
-        run: |
-          set -euo pipefail
-          if [ -f "${{ matrix.name }}/melange.yaml" ]; then
-            PKG_VERSION=$(awk '/^  version:/ {print $2}' "${{ matrix.name }}/melange.yaml")
-            PKG_EPOCH=$(awk '/^  epoch:/ {print $2}' "${{ matrix.name }}/melange.yaml")
-            echo "tag=${PKG_VERSION}-r${PKG_EPOCH}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=latest" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Re-index local packages
-        run: |
-          if [ -f "melange.rsa" ]; then
-            for arch in x86_64 aarch64; do
-              if [ -d "packages/$arch" ]; then
-                echo "Indexing $arch packages..."
-                melange index --signing-key melange.rsa -o "packages/$arch/APKINDEX.tar.gz" "packages/$arch"/*.apk
-              fi
-            done
-          fi
+          image-tar: "${{ matrix.name }}-aarch64.tar"
+          image-name: ${{ matrix.name }}
+          arch: aarch64
 
       - name: Publish multi-arch image
+        if: github.event_name != 'pull_request'
         run: |
           ARGS=""
           if [ -f "melange.rsa.pub" ]; then
@@ -475,6 +417,7 @@ jobs:
             $ARGS
 
       - name: Sign image with cosign
+        if: github.event_name != 'pull_request'
         run: |
           cosign sign \
             --yes \
@@ -484,20 +427,39 @@ jobs:
   # SUMMARY                                                                    #
   ##############################################################################
   summary:
-    needs: [verify-images, publish]
+    needs: [discover, melange-build-base, melange-build-deps, build-images]
     runs-on: ubuntu-latest
     if: always()
     permissions: {}
     steps:
       - name: Check results
         run: |
-          VERIFY="${{ needs.verify-images.result }}"
-          PUBLISH="${{ needs.publish.result }}"
-          echo "verify-images: $VERIFY"
-          echo "publish: $PUBLISH"
+          DISCOVER="${{ needs.discover.result }}"
+          BASE="${{ needs.melange-build-base.result }}"
+          DEPS="${{ needs.melange-build-deps.result }}"
+          BUILD_IMAGES="${{ needs.build-images.result }}"
+          echo "discover: $DISCOVER"
+          echo "melange-build-base: $BASE"
+          echo "melange-build-deps: $DEPS"
+          echo "build-images: $BUILD_IMAGES"
 
-          if [[ "$VERIFY" != "success" && "$VERIFY" != "skipped" ]]; then
-            echo "::error::Image verification did not succeed"
+          if [[ "$DISCOVER" != "success" ]]; then
+            echo "::error::Discover did not succeed"
+            exit 1
+          fi
+
+          if [[ "$BASE" != "success" && "$BASE" != "skipped" ]]; then
+            echo "::error::Base package build did not succeed"
+            exit 1
+          fi
+
+          if [[ "$DEPS" != "success" && "$DEPS" != "skipped" ]]; then
+            echo "::error::Dependent package build did not succeed"
+            exit 1
+          fi
+
+          if [[ "$BUILD_IMAGES" != "success" && "$BUILD_IMAGES" != "skipped" ]]; then
+            echo "::error::Image build/scan/publish did not succeed"
             exit 1
           fi
 
@@ -505,7 +467,7 @@ jobs:
   # CLEANUP OLD VERSIONS                                                       #
   ##############################################################################
   cleanup:
-    needs: [publish]
+    needs: [build-images]
     runs-on: ubuntu-latest
     if: always() && github.event_name != 'pull_request'
     permissions:

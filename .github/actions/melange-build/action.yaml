@@ -1,0 +1,106 @@
+name: Melange build
+description: Build, test and upload a melange package
+
+inputs:
+  package-name:
+    description: Package directory name
+    required: true
+  arch:
+    description: Target architecture
+    required: true
+  has-dependencies:
+    description: Whether the package needs locally built dependencies
+    required: false
+    default: "false"
+  event-name:
+    description: Workflow event name
+    required: true
+  signing-key-secret:
+    description: Private signing key for protected branches
+    required: false
+    default: ""
+  signing-key-pub-secret:
+    description: Public signing key for protected branches
+    required: false
+    default: ""
+  melange-version:
+    description: melange version to install
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install melange
+      shell: bash
+      run: |
+        set -euo pipefail
+        go install chainguard.dev/melange@${{ inputs.melange-version }}
+        echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+    - name: Download ephemeral signing key (PR)
+      if: ${{ inputs.event-name == 'pull_request' }}
+      uses: actions/download-artifact@v8
+      with:
+        name: melange-ephemeral-key
+        path: .
+
+    - name: Setup signing key (protected branch)
+      if: ${{ inputs.event-name != 'pull_request' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf '%s\n' "${{ inputs.signing-key-secret }}" > melange.rsa
+        printf '%s\n' "${{ inputs.signing-key-pub-secret }}" > melange.rsa.pub
+        chmod 600 melange.rsa
+
+    - name: Download base packages (same arch)
+      if: ${{ inputs.has-dependencies == 'true' }}
+      uses: actions/download-artifact@v8
+      with:
+        pattern: packages-*-${{ inputs.arch }}
+        merge-multiple: true
+        path: .
+
+    - name: Re-index local packages
+      if: ${{ inputs.has-dependencies == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        chmod 600 melange.rsa
+        if [ -d "packages/${{ inputs.arch }}" ] && compgen -G "packages/${{ inputs.arch }}/*.apk" > /dev/null; then
+          melange index --signing-key melange.rsa -o "packages/${{ inputs.arch }}/APKINDEX.tar.gz" "packages/${{ inputs.arch }}"/*.apk
+        fi
+
+    - name: Build package with melange
+      shell: bash
+      run: |
+        set -euo pipefail
+        chmod 600 melange.rsa
+        melange build "${{ inputs.package-name }}/melange.yaml" \
+          --arch "${{ inputs.arch }}" \
+          --signing-key melange.rsa \
+          --repository-append ./packages \
+          --keyring-append ./melange.rsa.pub \
+          --out-dir ./packages \
+          --runner docker
+
+    - name: Run smoke tests
+      shell: bash
+      run: |
+        set -euo pipefail
+        chmod 600 melange.rsa
+        melange test "${{ inputs.package-name }}/melange.yaml" \
+          --arch "${{ inputs.arch }}" \
+          --signing-key melange.rsa \
+          --repository-append ./packages \
+          --keyring-append ./melange.rsa.pub \
+          --runner docker
+
+    - name: Upload packages
+      uses: actions/upload-artifact@v7
+      with:
+        name: packages-${{ inputs.package-name }}-${{ inputs.arch }}
+        path: |
+          packages/
+          melange.rsa.pub
+        retention-days: 1
