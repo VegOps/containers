@@ -1,0 +1,83 @@
+package:
+  name: electrs
+  version: 0.11.1
+  epoch: 0
+  description: An efficient re-implementation of Electrum Server in Rust
+  copyright:
+    - license: MIT
+
+environment:
+  contents:
+    repositories:
+      - &wolfi-repository https://packages.wolfi.dev/os
+    keyring:
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - build-base
+      - busybox
+      - clang-18
+      - lz4-dev
+      - lz4-static
+      - openssl-static
+      - pkgconf
+      - rocksdb
+      - rust
+      - snappy-dev
+      - snappy-static
+      - zlib-dev
+      - zlib-static
+      - zstd-dev
+      - zstd-static
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/romanz/electrs
+      tag: v${{package.version}}
+
+  - name: Build electrs
+    runs: |
+      export CARGO_HOME="${PWD}/.cargo"
+      export CARGO_TARGET_DIR="${PWD}/target"
+      export ROCKSDB_INCLUDE_DIR=/usr/include
+      export ROCKSDB_LIB_DIR=/usr/lib
+      export ROCKSDB_STATIC=1
+      export SNAPPY_LIB_DIR=/usr/lib
+      export SNAPPY_STATIC=1
+      export RUSTFLAGS="-C link-arg=-Wl,-Bstatic -C link-arg=-lz -C link-arg=-lsnappy -C link-arg=-Wl,-Bdynamic"
+
+      cargo build \
+        --bin electrs \
+        --features metrics_process \
+        --release \
+        --locked \
+        --jobs "$(nproc)"
+
+  - runs: |
+      install -Dm755 target/release/electrs "${{targets.destdir}}/usr/bin/electrs"
+
+  - uses: strip
+
+update:
+  enabled: true
+  github:
+    identifier: romanz/electrs
+    use-tag: true
+    tag-filter-prefix: v0.11.
+    strip-prefix: v
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic electrs command test
+      runs: |
+        test -x /usr/bin/electrs
+        electrs --version >/dev/null 2>&1
