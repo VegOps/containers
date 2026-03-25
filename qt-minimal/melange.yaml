@@ -42,7 +42,6 @@ pipeline:
         -no-dbus \
         -no-widgets \
         -no-feature-animation \
-        -no-feature-libresolv \
         -openssl \
         -openssl-linked \
         -optimize-size \
