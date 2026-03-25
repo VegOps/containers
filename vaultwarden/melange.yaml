@@ -58,7 +58,7 @@ pipeline:
         --release \
         --features sqlite,mysql,postgresql
 
-      web_vault_digest="$(curl -fsSL "https://hub.docker.com/v2/repositories/vaultwarden/web-vault/tags/${{vars.web-vault-version}}" | jq -r '.digest')"
+      web_vault_digest="$(curl -fsSL "https://hub.docker.com/v2/repositories/vaultwarden/web-vault/tags/v${{vars.web-vault-version}}" | jq -r '.digest')"
       test -n "${web_vault_digest}" && test "${web_vault_digest}" != "null"
 
       tmpweb="$(mktemp -d)"
