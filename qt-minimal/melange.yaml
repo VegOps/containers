@@ -75,7 +75,7 @@ update:
   github:
     identifier: qt/qtbase
     use-tag: true
-    tag-filter-prefix: v6.10.
+    tag-filter-prefix: v6.11.
     strip-prefix: v
 
 test:
