@@ -73,4 +73,4 @@ test:
     - runs: |
         test -s /usr/lib/librocksdb.a
         test -f /usr/include/rocksdb/db.h
-        nm -A /usr/lib/librocksdb.a | grep -q ' ZSTD_'
+        nm -A /usr/lib/librocksdb.a | grep ' ZSTD_' >/dev/null
