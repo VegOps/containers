@@ -53,6 +53,7 @@
 | `ghcr.io/vegops/seerr`              | Seerr request manager        | Compiled from source (Node + pnpm) |
 | `ghcr.io/vegops/sonarr`             | Sonarr TV manager            | Compiled from source (.NET + yarn) |
 | `ghcr.io/vegops/sqlite`             | SQLite CLI                   | Wolfi package (apko-only)          |
+| `ghcr.io/vegops/tautulli`           | Tautulli analytics for Plex  | Compiled from source (Python)      |
 | `ghcr.io/vegops/tor`                | Tor anonymity network        | Compiled from source (autoconf)    |
 | `ghcr.io/vegops/vaultwarden`        | Vaultwarden password manager | Compiled from source (Rust)        |
 

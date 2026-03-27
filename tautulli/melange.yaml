@@ -1,0 +1,81 @@
+package:
+  name: tautulli
+  version: 2.16.1
+  epoch: 0
+  description: Monitoring, analytics, and notifications for Plex Media Server
+  copyright:
+    - license: GPL-3.0-or-later
+  options:
+    no-depends: true
+
+environment:
+  contents:
+    repositories:
+      - &wolfi-repository https://packages.wolfi.dev/os
+    keyring:
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+      - ca-certificates-bundle
+      - python3
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/Tautulli/Tautulli
+      tag: v${{package.version}}
+
+  - runs: |
+      set -eu
+
+      mkdir -p \
+        "${{targets.destdir}}/config" \
+        "${{targets.destdir}}/tautulli" \
+        "${{targets.destdir}}/tautulli/etc" \
+        "${{targets.destdir}}/tautulli/var" \
+        "${{targets.destdir}}/usr/lib/tautulli" \
+        "${{targets.destdir}}/usr/share/licenses/tautulli"
+
+      cp -a \
+        data \
+        lib \
+        plexpy \
+        PlexPy.py \
+        Tautulli.py \
+        "${{targets.destdir}}/usr/lib/tautulli/"
+
+      cp LICENSE "${{targets.destdir}}/usr/share/licenses/tautulli/LICENSE"
+
+      printf '%s\n' master > "${{targets.destdir}}/usr/lib/tautulli/branch.txt"
+      git rev-parse HEAD > "${{targets.destdir}}/usr/lib/tautulli/version.txt"
+
+      cp -a rootfs/. "${{targets.destdir}}/"
+
+      : > "${{targets.destdir}}/config/DOCKER"
+
+update:
+  enabled: true
+  github:
+    identifier: Tautulli/Tautulli
+    use-tag: true
+    strip-prefix: v
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+        - python3
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic Tautulli package test
+      runs: |
+        test -f /usr/lib/tautulli/Tautulli.py
+        test -d /usr/lib/tautulli/lib
+        test -f /usr/lib/tautulli/version.txt
+        test -f /config/DOCKER
+        python3 /usr/lib/tautulli/Tautulli.py --help >/dev/null
