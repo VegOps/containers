@@ -44,6 +44,7 @@
 | `ghcr.io/vegops/miniupnpc`          | MiniUPnP CLI/Library         | Compiled from source (make)        |
 | `ghcr.io/vegops/openssl`            | OpenSSL CLI                  | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/openssl-static`     | OpenSSL static library       | Compiled from source (CMake)       |
+| `ghcr.io/vegops/plex`               | Plex Media Server            | Official Debian package            |
 | `ghcr.io/vegops/postgres`           | PostgreSQL database          | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/prometheus-minimal` | Prometheus monitoring        | Compiled from source (Go)          |
 | `ghcr.io/vegops/prowlarr`           | Prowlarr indexer manager     | Compiled from source (.NET + yarn) |

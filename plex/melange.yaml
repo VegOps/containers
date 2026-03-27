@@ -1,0 +1,104 @@
+package:
+  name: plex
+  version: 1.43.0.10492
+  epoch: 0
+  description: Plex Media Server
+  copyright:
+    - license: LicenseRef-Plex-EULA
+  options:
+    no-depends: true
+  dependencies:
+    runtime:
+      - libcrypto3
+      - libssl3
+
+environment:
+  environment:
+  contents:
+    repositories:
+      - &wolfi-repository https://packages.wolfi.dev/os
+    keyring:
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - build-base
+      - busybox
+      - ca-certificates-bundle
+      - curl
+      - gpg
+      - gpg-agent
+      - jq
+      - wget
+      - xz
+      - zlib-dev
+      - zlib-static
+
+pipeline:
+  - runs: |
+      set -eu
+      gpg --import key.txt
+
+  - name: Download official Plex package
+    runs: |
+      set -eu
+
+      case "${{build.arch}}" in
+        x86_64)  TARGETARCH="amd64" ;;
+        aarch64) TARGETARCH="arm64" ;;
+      esac
+
+      BUILD_VERSION="$(curl -s https://plex.tv/api/downloads/5.json | jq -r '.computer.Linux.version')"
+
+      if ! echo ${BUILD_VERSION} | grep -q ${{package.version}}; then
+        echo "${{package.version}} and ${BUILD_VERSION} do not match!" >&2
+        exit 1
+      fi
+
+      wget -q --show-progress --progress=bar:force -O plex.deb https://downloads.plex.tv/plex-media-server-new/${BUILD_VERSION}/debian/plexmediaserver_${BUILD_VERSION}_${TARGETARCH}.deb
+      gpg --verify plex.deb
+
+      mkdir -p rootfs
+      (
+        cd rootfs
+        ar p ../plex.deb data.tar.xz | tar -xJf -
+      )
+
+  - name: Install artifacts
+    runs: |
+      set -eu
+
+      mkdir -p \
+        "${{targets.destdir}}/usr/bin" \
+        "${{targets.destdir}}/usr/lib" \
+        "${{targets.destdir}}/plex/etc/Library/Application Support" \
+        "${{targets.destdir}}/plex/tmp"
+      cp -a rootfs/usr/lib/plexmediaserver "${{targets.destdir}}/usr/lib/"
+
+      # Create a symlink for easier execution of the Plex Media Server binary
+      ln -sf "/usr/lib/plexmediaserver/Plex Media Server" "${{targets.destdir}}/usr/bin/plex"
+
+      install -Dm644 rootfs/usr/lib/plexmediaserver/Resources/LICENSE "${{targets.destdir}}/usr/share/licenses/plex/LICENSE"
+
+  - uses: strip
+
+update:
+  enabled: false
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+        - ca-certificates-bundle
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic Plex package test
+      runs: |
+        test -x "/usr/lib/plexmediaserver/Plex Media Server"
+        test -f /usr/share/licenses/plex/LICENSE
+        test -d /plex/etc
+        test -d "/plex/etc/Library/Application Support"
+        test -d /plex/tmp
