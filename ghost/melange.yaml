@@ -11,6 +11,9 @@ package:
 environment:
   environment:
     NODE_ENV: production
+    XDG_CACHE_HOME: /var/cache/melange/xdg
+    XDG_CONFIG_HOME: /var/cache/melange/config
+    YARN_CACHE_FOLDER: /var/cache/melange/yarn
     npm_config_loglevel: warn
   contents:
     repositories:
@@ -41,6 +44,12 @@ pipeline:
   - name: Install production dependencies and package files
     runs: |
       set -eu
+
+      mkdir -p \
+        "${XDG_CACHE_HOME}" \
+        "${XDG_CONFIG_HOME}" \
+        "${YARN_CACHE_FOLDER}" \
+        "${npm_config_cache}"
 
       case "${{build.arch}}" in
         x86_64)  node_arch="x64" ;;
