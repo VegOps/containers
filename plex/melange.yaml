@@ -33,15 +33,13 @@ environment:
       - zlib-static
 
 pipeline:
-  - runs: |
-      set -eu
-      export GNUPGHOME="$(mktemp -d)"
-      trap 'rm -rf "$GNUPGHOME"' EXIT
-      gpg --import key.txt
-
   - name: Download official Plex package
     runs: |
       set -eu
+
+      export GNUPGHOME="$(mktemp -d)"
+      trap 'rm -rf "$GNUPGHOME"' EXIT
+      gpg --import key.txt
 
       case "${{build.arch}}" in
         x86_64)  TARGETARCH="amd64" ;;
@@ -100,6 +98,7 @@ test:
     - name: Basic Plex package test
       runs: |
         test -x "/usr/lib/plexmediaserver/Plex Media Server"
+        test -x /usr/bin/plex
         test -f /usr/share/licenses/plex/LICENSE
         test -d /plex/etc
         test -d "/plex/etc/Library/Application Support"
