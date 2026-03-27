@@ -1,0 +1,105 @@
+package:
+  name: ghost
+  version: 6.22.1 # renovate: datasource=npm depName=ghost
+  epoch: 0
+  description: Professional publishing platform
+  copyright:
+    - license: MIT
+  options:
+    no-depends: true
+
+environment:
+  environment:
+    NODE_ENV: production
+    npm_config_loglevel: warn
+  contents:
+    repositories:
+      - &wolfi-repository https://packages.wolfi.dev/os
+    keyring:
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - build-base
+      - busybox
+      - ca-certificates-bundle
+      - curl
+      - nodejs-22-minimal
+      - npm
+      - py3-setuptools
+      - python3
+      - yarn
+
+pipeline:
+  - name: Fetch official Ghost npm package
+    runs: |
+      set -eu
+
+      npm pack "ghost@${{package.version}}" --silent
+      mkdir -p package
+      tar -xzf "ghost-${{package.version}}.tgz" -C package --strip-components=1
+      rm -f "ghost-${{package.version}}.tgz"
+
+  - name: Install production dependencies and package files
+    runs: |
+      set -eu
+
+      case "${{build.arch}}" in
+        x86_64)  node_arch="x64" ;;
+        aarch64) node_arch="arm64" ;;
+      esac
+
+      cd package
+
+      yarn install \
+        --ignore-scripts \
+        --production \
+        --non-interactive \
+        --prefer-offline
+
+      [ -d node_modules/sqlite3 ] && {
+        (
+          cd node_modules/sqlite3
+          npm run install
+        )
+      }
+
+      # Prune unnecessary files from node_modules
+      npx --yes @usex/prune-mod@0.0.14 --verbose
+      find node_modules -type d \( -name '*musl*' -o -name 'win64-bin' -o -name 'osx-bin' \) -prune -exec rm -rf {} +
+      find node_modules -type f \( -name '*.dll' -o -name '*.exe' -o -name '*.node' -path '*musl*' \) -delete
+      find node_modules -type d -path '*/prebuilds/*' ! -name "linux-${node_arch}" -prune -exec rm -rf {} +
+
+      mkdir -p log
+      mkdir -p "${{targets.destdir}}/usr/lib/ghost"
+      cp -a . "${{targets.destdir}}/usr/lib/ghost/"
+      install -Dm644 LICENSE "${{targets.destdir}}/usr/share/licenses/ghost/LICENSE"
+
+update:
+  enabled: false
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+        - ca-certificates-bundle
+        - fontconfig
+        - nodejs-22-minimal
+        - sqlite-libs
+        - tzdata
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - name: Basic Ghost package test
+      runs: |
+        test -f /usr/lib/ghost/index.js
+        test ! -e /usr/bin/ghost-entrypoint
+        test ! -e /usr/lib/ghost/config.production.json
+        test -d /usr/lib/ghost/content
+        test -d /usr/lib/ghost/log
+        test -d /usr/lib/ghost/core/built/admin
+
+        cd /usr/lib/ghost
+        node -e "require('sqlite3'); require('sharp'); const pkg = require('./package.json'); if (pkg.version !== '${{package.version}}') process.exit(1)"
