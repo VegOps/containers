@@ -193,12 +193,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install melange
-        uses: chainguard-dev/actions/setup-melange@b2555de0cf9724fb9b49d050ff18bd1f49562ba7 # v1.6.29
+        uses: chainguard-dev/actions/setup-melange@9d631658f55713e5f63ca0cc21ee168f81301fd9 # v1.6.30
         with:
           version: ${{ env.MELANGE_VERSION }}
 
       - name: Generate ephemeral signing key
-        uses: chainguard-dev/actions/melange-keygen@b2555de0cf9724fb9b49d050ff18bd1f49562ba7 # v1.6.29
+        uses: chainguard-dev/actions/melange-keygen@9d631658f55713e5f63ca0cc21ee168f81301fd9 # v1.6.30
         with:
           signing-key-path: ${{ github.workspace }}/melange.rsa
 
@@ -467,7 +467,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install melange
-        uses: chainguard-dev/actions/setup-melange@b2555de0cf9724fb9b49d050ff18bd1f49562ba7 # v1.6.29
+        uses: chainguard-dev/actions/setup-melange@9d631658f55713e5f63ca0cc21ee168f81301fd9 # v1.6.30
         with:
           version: ${{ env.MELANGE_VERSION }}
 
@@ -526,7 +526,7 @@ jobs:
         run: rm -f sbom-*.spdx.json
 
       - name: Build image tarball (x86_64)
-        uses: chainguard-images/actions/apko-build@a32d54a799f0b2d2e5a75f94805b2509cc898ae8 # v1.0.37
+        uses: chainguard-images/actions/apko-build@8e701b320e7efcb120a1115de26e9fe833f86390 # v1.0.38
         with:
           apko-image: ${{ env.APKO_IMAGE }}
           config: ${{ matrix.name }}/apko.yaml
@@ -554,7 +554,7 @@ jobs:
         run: rm -f sbom-*.spdx.json
 
       - name: Build image tarball (aarch64)
-        uses: chainguard-images/actions/apko-build@a32d54a799f0b2d2e5a75f94805b2509cc898ae8 # v1.0.37
+        uses: chainguard-images/actions/apko-build@8e701b320e7efcb120a1115de26e9fe833f86390 # v1.0.38
         with:
           apko-image: ${{ env.APKO_IMAGE }}
           config: ${{ matrix.name }}/apko.yaml
@@ -714,7 +714,7 @@ jobs:
       - name: Publish multi-arch image
         if: github.event_name != 'pull_request'
         id: publish
-        uses: chainguard-images/actions/apko-publish@a32d54a799f0b2d2e5a75f94805b2509cc898ae8 # v1.0.37
+        uses: chainguard-images/actions/apko-publish@8e701b320e7efcb120a1115de26e9fe833f86390 # v1.0.38
         with:
           apko-image: ${{ env.APKO_IMAGE }}
           config: ${{ matrix.name }}/apko.yaml
