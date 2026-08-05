@@ -44,11 +44,9 @@ pipeline:
       DEBUG_LEVEL=0 \
       USE_RTTI=1 \
       EXTRA_CXXFLAGS="-Wno-error=maybe-uninitialized" \
-      make static_lib -j$(nproc)
-
       DESTDIR="${{targets.destdir}}" \
       PREFIX=/usr \
-      make install-static
+      make install-static -j$(nproc)
 
   - runs: |
       strip --strip-unneeded "${{targets.destdir}}/usr/lib/librocksdb.a"
