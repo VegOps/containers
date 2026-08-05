@@ -1,0 +1,23 @@
+services:
+  garage:
+    image: ghcr.io/vegops/garage:test
+    restart: unless-stopped
+    ports:
+      - "3900:3900"
+    volumes:
+      - garage-config:/garage/etc
+      - garage-data:/garage/var
+
+  webui:
+    image: ghcr.io/vegops/garage-webui:test
+    restart: unless-stopped
+    depends_on:
+      - garage
+    ports:
+      - "3909:3909"
+    volumes:
+      - garage-config:/garage/etc:ro
+
+volumes:
+  garage-config:
+  garage-data:
