@@ -193,12 +193,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install melange
-        uses: chainguard-dev/actions/setup-melange@9d631658f55713e5f63ca0cc21ee168f81301fd9 # v1.6.30
+        uses: chainguard-dev/actions/setup-melange@bed8050123fff65538e2db1902ff9404030c0221 # v1.6.31
         with:
           version: ${{ env.MELANGE_VERSION }}
 
       - name: Generate ephemeral signing key
-        uses: chainguard-dev/actions/melange-keygen@9d631658f55713e5f63ca0cc21ee168f81301fd9 # v1.6.30
+        uses: chainguard-dev/actions/melange-keygen@bed8050123fff65538e2db1902ff9404030c0221 # v1.6.31
         with:
           signing-key-path: ${{ github.workspace }}/melange.rsa
 
@@ -467,7 +467,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install melange
-        uses: chainguard-dev/actions/setup-melange@9d631658f55713e5f63ca0cc21ee168f81301fd9 # v1.6.30
+        uses: chainguard-dev/actions/setup-melange@bed8050123fff65538e2db1902ff9404030c0221 # v1.6.31
         with:
           version: ${{ env.MELANGE_VERSION }}
 
