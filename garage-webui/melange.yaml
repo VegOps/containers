@@ -1,0 +1,75 @@
+package:
+  name: garage-webui
+  version: 1.1.0
+  epoch: 0
+  description: Web interface for Garage object storage
+  copyright:
+    - license: MIT
+
+environment:
+  environment:
+    CGO_ENABLED: "0"
+    GOTOOLCHAIN: local
+  contents:
+    repositories:
+      - &wolfi-repository https://packages.wolfi.dev/os
+    keyring:
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+      - nodejs-22
+      - pnpm
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/khairul169/garage-webui
+      tag: ${{package.version}}
+
+  - environment:
+      CI: "true"
+      HOME: /home/build/.home
+    runs: |
+      pnpm install --frozen-lockfile || pnpm approve-builds @swc/core esbuild
+      pnpm run build
+      mkdir -p backend/ui/dist
+      cp -a dist/. backend/ui/dist/
+
+  - uses: go/build
+    with:
+      modroot: backend
+      packages: .
+      output: garage-webui
+      tags: prod
+      strip: "-s -w"
+
+  - uses: strip
+
+update:
+  enabled: true
+  github:
+    identifier: khairul169/garage-webui
+    use-tag: true
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+        - wget
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - runs: |
+        test -x /usr/bin/garage-webui
+        CONFIG_PATH=/tmp/missing.toml garage-webui >/tmp/garage-webui.log 2>&1 &
+        pid=$!
+        trap 'kill "$pid" 2>/dev/null || true' EXIT
+        for _ in $(seq 1 10); do
+          wget -qO /tmp/index.html http://127.0.0.1:3909 && break
+          sleep 1
+        done
+        grep -q '<div id="root"></div>' /tmp/index.html
