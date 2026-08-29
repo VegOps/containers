@@ -13,7 +13,6 @@ contents:
     - postgresql-18-client
     - postgresql-18-client-base
     - postgresql-18-contrib
-    - ecpg-18
     - libpq-18
     - pgaudit-18
 
