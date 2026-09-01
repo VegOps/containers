@@ -13,7 +13,7 @@ contents:
     - postgresql-18-client
     - postgresql-18-client-base
     - postgresql-18-contrib
-    - ecpg-18
+    # - ecpg-18 # Pulled transitively; explicit selection can mix Wolfi revisions.
     - libpq-18
     - pgaudit-18
 
